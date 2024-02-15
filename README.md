@@ -1,6 +1,6 @@
 # Descripción del Proyecto
 
-El proyecto consiste en una aplicación de sincronización bidireccional entre una carpeta local y un servidor FTP. Permite verificar los cambios entre los archivos presentes en la carpeta local y los archivos en el servidor FTP, y sincroniza los archivos faltantes entre ambos.
+El proyecto consiste en un google drive realizado en java. Habra dos carpetas una del servidor y otra local, ambas estaran sincronizadas y deberan tener los mismos archivos
 
 ## Dependencias Utilizadas
 
@@ -51,6 +51,4 @@ La aplicación permite subir archivos de la carpeta local al servidor FTP. Para 
 3. La verificación de cambios se ejecuta de forma periódica, comparando los archivos en la carpeta local y en el servidor FTP.
 4. Se muestran mensajes indicando el estado de la sincronización y los cambios detectados.
 
-## Conclusiones
 
-El proyecto proporciona una solución simple pero efectiva para mantener sincronizados los archivos entre una carpeta local y un servidor FTP. Puede ser útil en escenarios donde se requiere mantener actualizada una carpeta local con los archivos presentes en un servidor FTP, y viceversa.
