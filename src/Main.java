@@ -12,6 +12,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+/*
+* @author Pablo Atenciano Jurado
+*
+* */
 public class Main {
 
     private static final String SERVIDOR = "localhost";
@@ -22,11 +26,11 @@ public class Main {
     private static final String CARPETA_LOCAL = "C:\\server2";
 
     public static void main(String[] args) {
-        // Crea un programador de tareas para verificar cambios cada 5 segundos
+        // Programador de tareas para verificar cambios cada 5 segundos
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
         scheduler.scheduleAtFixedRate(Main::verificarCambios, 0, 50, TimeUnit.SECONDS);
 
-        // Mantén el programa en ejecución
+        // Mantén el prograama en ejecución
         System.out.println("Presiona ENTER para detener el programa o ingresa la ruta de un archivo para subirlo:");
         Scanner scanner = new Scanner(System.in);
         String userInput;
@@ -35,7 +39,7 @@ public class Main {
             subirArchivo(new File("C:\\Users\\usuario\\Desktop\\"+userInput));
         }
 
-        // Detén el programador de tareas
+        // Parar el programador de tareas
         scheduler.shutdown();
     }
 
