@@ -9,13 +9,10 @@ import java.util.Scanner;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
-/*
-* @author Pablo Atenciano Jurado
-*
-* */
+/**
+ * Clase principal que gestiona la transferencia de archivos entre una carpeta local y un servidor FTP.
+ */
 public class Main {
 
     private static final String SERVIDOR = "localhost";
@@ -25,24 +22,40 @@ public class Main {
     private static final String CARPETA_SERVIDOR = "C:\\servidor";
     private static final String CARPETA_LOCAL = "C:\\server2";
 
+    /**
+     * Método principal que inicia el programa.
+     * @param args Argumentos de la línea de comandos (no utilizado).
+     */
     public static void main(String[] args) {
-        // Programador de tareas para verificar cambios cada 5 segundos
+        FTPClient ftpClient = new FTPClient();
+        // Programador de tareas para verificar cambios cada 10 segundos
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-        scheduler.scheduleAtFixedRate(Main::verificarCambios, 0, 50, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(Main::verificarCambios, 0, 10, TimeUnit.SECONDS);
+        try {
+            ftpClient.connect(SERVIDOR, PUERTO);
+            ftpClient.login(USUARIO, PASSWORD);
+            ftpClient.enterLocalPassiveMode();
+            ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
-        // Mantén el prograama en ejecución
+        // Mantén el programa en ejecución
         System.out.println("Presiona ENTER para detener el programa o ingresa la ruta de un archivo para subirlo:");
         Scanner scanner = new Scanner(System.in);
         String userInput;
         while (!(userInput = scanner.nextLine()).isEmpty()) {
             System.out.println(userInput);
-            subirArchivo(new File("C:\\Users\\usuario\\Desktop\\"+userInput));
+            subirArchivo(ftpClient, new File("C:\\Users\\usuario\\Desktop\\" + userInput));
         }
 
         // Parar el programador de tareas
         scheduler.shutdown();
     }
 
+    /**
+     * Método que verifica cambios entre la carpeta local y el servidor FTP.
+     */
     private static void verificarCambios() {
         FTPClient ftpClient = new FTPClient();
         try {
@@ -61,11 +74,12 @@ public class Main {
             File carpetaLocal = new File(CARPETA_LOCAL);
             File[] archivosLocales = carpetaLocal.listFiles();
 
-            // Compara los archivos remotos con los locales
+            // Verifica si algún archivo remoto ha sido borrado
             for (FTPFile archivoRemoto : archivosRemotos) {
                 String nombreArchivoRemoto = archivoRemoto.getName();
                 boolean encontrado = false;
                 for (File archivoLocal : archivosLocales) {
+                    // Compara solo si los nombres de los archivos coinciden
                     if (archivoLocal.getName().equals(nombreArchivoRemoto)) {
                         encontrado = true;
                         break;
@@ -77,7 +91,7 @@ public class Main {
                 }
             }
 
-            // Compara los archivos locales con los remotos
+            // Verifica si algún archivo local debe ser subido al servidor
             for (File archivoLocal : archivosLocales) {
                 String nombreArchivoLocal = archivoLocal.getName();
                 boolean encontrado = false;
@@ -89,7 +103,7 @@ public class Main {
                 }
                 if (!encontrado) {
                     // Subir el archivo local que falta en el servidor FTP
-                    subirArchivo(archivoLocal);
+                    subirArchivo(ftpClient, archivoLocal, nombreArchivoLocal);
                 }
             }
 
@@ -108,6 +122,13 @@ public class Main {
         }
     }
 
+    /**
+     * Método que descarga un archivo del servidor FTP.
+     * @param ftpClient Cliente FTP
+     * @param nombreRemoto Nombre del archivo en el servidor FTP
+     * @param archivoLocal Archivo local donde se descargará el archivo
+     * @throws IOException Si hay un error de E/S durante la descarga
+     */
     private static void descargarArchivo(FTPClient ftpClient, String nombreRemoto, File archivoLocal) throws IOException {
         OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(archivoLocal));
         boolean descargado = ftpClient.retrieveFile(nombreRemoto, outputStream);
@@ -120,82 +141,106 @@ public class Main {
         }
     }
 
-    private static void subirArchivo(File archivoLocal) {
+    /**
+     * Método que sube un archivo al servidor FTP.
+     * @param ftpClient Cliente FTP
+     * @param archivoLocal Archivo local que se subirá al servidor FTP
+     * @param nombreArchivoRemoto Nombre del archivo en el servidor FTP
+     */
+    private static void subirArchivo(FTPClient ftpClient, File archivoLocal, String nombreArchivoRemoto) {
         if (!archivoLocal.exists()) {
             System.out.println("El archivo especificado no existe.");
             return;
         }
 
-        FTPClient ftpClient = new FTPClient();
         try {
-            System.out.println("Subiendo archivo " + archivoLocal.getName() + " al servidor FTP...");
-
-            // Conecta al servidor FTP
-            ftpClient.connect(SERVIDOR, PUERTO);
-            ftpClient.login(USUARIO, PASSWORD);
-            ftpClient.enterLocalPassiveMode();
-            ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
-
-            // Nombre del archivo comprimido con la fecha y hora actual
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
-            String nombreArchivoComprimido = dateFormat.format(new Date()) + ".zip";
+            System.out.println("Subiendo archivo " + archivoLocal.getName() + " con nombre " + nombreArchivoRemoto + " al servidor FTP...");
 
             // Comprimir archivo
-            File archivoComprimido = comprimirArchivo(archivoLocal, nombreArchivoComprimido);
+            File archivoComprimido = comprimirArchivo(archivoLocal, nombreArchivoRemoto);
 
-            // Sube el archivo comprimido al servidor FTP
+            // Subir el archivo al servidor FTP
             InputStream inputStream = new FileInputStream(archivoComprimido);
-            boolean subido = ftpClient.storeFile(archivoComprimido.getName(), inputStream);
+            boolean subido = ftpClient.storeFile(nombreArchivoRemoto, inputStream);
             inputStream.close();
 
             if (subido) {
-                System.out.println("Se ha subido el archivo " + archivoComprimido.getName() + " al servidor FTP.");
+                System.out.println("Se ha subido el archivo " + archivoLocal.getName() + " con nombre " + nombreArchivoRemoto + " al servidor FTP.");
             } else {
-                System.out.println("Error al subir el archivo " + archivoComprimido.getName() + " al servidor FTP.");
+                System.out.println("Error al subir el archivo " + archivoLocal.getName() + " con nombre " + nombreArchivoRemoto + " al servidor FTP.");
             }
 
         } catch (IOException e) {
             System.out.println("Error al subir archivo: " + e.getMessage());
-        } finally {
-            try {
-                // Cierra la conexión FTP
-                if (ftpClient.isConnected()) {
-                    ftpClient.logout();
-                    ftpClient.disconnect();
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
 
-    private static File comprimirArchivo(File archivoLocal, String nombreArchivoComprimido) throws IOException {
+    /**
+     * Método que sube un archivo al servidor FTP con un nombre basado en la fecha actual.
+     * @param ftpClient Cliente FTP
+     * @param archivoLocal Archivo local que se subirá al servidor FTP
+     */
+    private static void subirArchivo(FTPClient ftpClient, File archivoLocal) {
+        if (!archivoLocal.exists()) {
+            System.out.println("El archivo especificado no existe.");
+            return;
+        }
+
+        try {
+            // Obtener la fecha actual
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd-hhmmss");
+            Date fechaActual = new Date();
+            String nombreArchivoRemoto = sdf.format(fechaActual) + ".zip"; // Nombre del archivo con la fecha actual y extensión .zip
+
+            System.out.println("Subiendo archivo " + archivoLocal.getName() + " con nombre " + nombreArchivoRemoto + " al servidor FTP...");
+
+            // Comprimir archivo
+            File archivoComprimido = comprimirArchivo(archivoLocal, nombreArchivoRemoto);
+
+            // Subir el archivo al servidor FTP
+            InputStream inputStream = new FileInputStream(archivoComprimido);
+            boolean subido = ftpClient.storeFile(nombreArchivoRemoto, inputStream);
+            inputStream.close();
+
+            if (subido) {
+                System.out.println("Se ha subido el archivo " + archivoLocal.getName() + " con nombre " + nombreArchivoRemoto + " al servidor FTP.");
+            } else {
+                System.out.println("Error al subir el archivo " + archivoLocal.getName() + " con nombre " + nombreArchivoRemoto + " al servidor FTP.");
+            }
+
+        } catch (IOException e) {
+            System.out.println("Error al subir archivo: " + e.getMessage());
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Método que comprime un archivo utilizando 7zip.
+     * @param archivoLocal Archivo local que se comprimirá
+     * @param nombreArchivoComprimido Nombre del archivo comprimido
+     * @return El archivo comprimido
+     * @throws IOException Si hay un error de E/S durante la compresión
+     * @throws InterruptedException Si el hilo actual es interrumpido mientras espera a que finalice el proceso
+     */
+    private static File comprimirArchivo(File archivoLocal, String nombreArchivoComprimido) throws IOException, InterruptedException {
         // Ruta del archivo comprimido
         String rutaArchivoComprimido = archivoLocal.getParent() + File.separator + nombreArchivoComprimido;
 
-        // Stream de salida para el archivo comprimido
-        FileOutputStream fos = new FileOutputStream(rutaArchivoComprimido);
-        ZipOutputStream zipOut = new ZipOutputStream(fos);
+        // Comando para comprimir usando 7zip desde el CMD
+        String comando = "\"C:\\Program Files\\7-Zip\\7z.exe\" a \"" + rutaArchivoComprimido + "\" \"" + archivoLocal.getAbsolutePath() + "\"";
 
-        // Stream de entrada para el archivo original
-        FileInputStream fis = new FileInputStream(archivoLocal);
+        // Ejecutar el comando usando el CMD
+        Process proceso = Runtime.getRuntime().exec(comando);
+        proceso.waitFor();
 
-        // Agrega el archivo original al archivo comprimido
-        ZipEntry zipEntry = new ZipEntry(archivoLocal.getName());
-        zipOut.putNextEntry(zipEntry);
-
-        // Lee el archivo original y escribe en el archivo comprimido
-        byte[] bytes = new byte[1024];
-        int length;
-        while ((length = fis.read(bytes)) >= 0) {
-            zipOut.write(bytes, 0, length);
+        // Verificar si la compresión fue exitosa
+        if (proceso.exitValue() == 0) {
+            return new File(rutaArchivoComprimido);
+        } else {
+            throw new IOException("Error al comprimir el archivo usando 7zip");
         }
-
-        // Cierra los streams
-        fis.close();
-        zipOut.close();
-        fos.close();
-
-        return new File(rutaArchivoComprimido);
     }
 }
