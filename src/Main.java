@@ -24,7 +24,6 @@ public class Main {
 
     /**
      * Método principal que inicia el programa.
-     * @param args Argumentos de la línea de comandos (no utilizado).
      */
     public static void main(String[] args) {
         FTPClient ftpClient = new FTPClient();
